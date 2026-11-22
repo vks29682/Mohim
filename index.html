@@ -599,7 +599,7 @@ function pageHome(){var pl=pendList(),HS=SLIDES.concat(pl.length?[PEND]:[]);
   acts.sort(function(a,b){return new Date(b.t)-new Date(a.t);});
   $('#main').innerHTML=
   '<section class="hero" id="hero">'+HS.map(function(s,i){return'<div class="slide'+(i?'':' on')+'">'+scene(i,s)+'</div>';}).join('')+
-  '<div class="hero-copy"><p class="eyebrow">महाराष्ट्र · '+st.nf+' किल्ले · '+st.nm+' सदस्य</p><h1>🚩 धारकरी सह्याद्रीचा 🚩</h1><p class="hero-verse">धारकरी सह्याद्रीचा, वादळांशी खेळणारा;<br>शिखर सर करणारा, संकटांसमोर न झुकणारा!</p></div>'+
+  '<div class="hero-copy"><p class="eyebrow">महाराष्ट्र · '+st.nf+' किल्ले · '+st.nm+' सदस्य</p><h1🚩धारकरी...</h1><p class="hero-verse">धारकरी सह्याद्रीचा, वादळांशी खेळणारा;<br>शिखर सर करणारा, संकटांसमोर न झुकणारा!</p></div>'+
   pendHtml(pl)+'<div class="pcard" id="pcard"></div><div class="hero-cap" id="hcap">'+SLIDES[0].n+' · '+SLIDES[0].h+'</div><div class="dots">'+HS.map(function(s,i){return'<button data-act="slide" data-i="'+i+'" aria-label="'+esc(s.n)+'"'+(i?'':' class="on"')+'></button>';}).join('')+'</div></section>'+
   '<div class="stack">'+
   '<div class="grid g4">'+
