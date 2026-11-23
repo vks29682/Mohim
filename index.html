@@ -1134,8 +1134,13 @@ function maybePendPop(){
   try{if(sessionStorage.getItem(PPKEY)===sig)return;sessionStorage.setItem(PPKEY,sig);}catch(e){}
   closePendPop();
   var me=session.mid&&pl.find(function(x){return x.mid===session.mid;}),tot=pl.reduce(function(s,x){return s+x.amt;},0),d=document.createElement('div');
-  
-
+  d.id='pendpop';d.className='pendpop';d.setAttribute('role','alertdialog');
+  d.innerHTML='<div class="pp-h"><b>💰 पेमेंट बाकी · '+pl.length+' सदस्य · '+rs(tot)+'</b><button class="btn sm" data-act="pendpop-close" aria-label="बंद करा">✕</button></div>'+
+    (me?'<div class="pp-me">⚠️ तुमचे पेमेंट बाकी आहे: <b>'+rs(me.amt)+'</b> ('+esc(me.forts.join(', '))+')</div>':'')+
+    '<ul>'+pl.map(function(x){return'<li><b>'+esc(x.name)+'</b><span>'+rs(x.amt)+'</span><small>'+esc(x.forts.join(', '))+'</small></li>';}).join('')+'</ul>'+
+    '<div class="row"><button class="btn sm primary" data-act="pendpop-go">ट्रिप / पेमेंट पहा</button><button class="btn sm" data-act="pendpop-close">नंतर</button></div>';
+  document.body.appendChild(d);
+}
 /* ----- trip list + detail ----- */
 function newTour(fort,date,days,title,pollId){
   var t={id:'TO'+Date.now(),fort:fort,date:date,days:days,title:title||'',pollId:pollId||'',v:2,status:0,parts:[],log:[{s:0,t:nowIso(),by:session.u}],created:nowIso()};
