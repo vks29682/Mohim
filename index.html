@@ -723,12 +723,12 @@ function newUserModal(){
   var today=new Date().toISOString().slice(0,10);
   openModal('<h2>नवीन सदस्य नोंदणी</h2>'+
   '<form class="form" data-form="newuser">'+
-  '<label>पूर्ण नाव (पहिला शब्द हाच User ID असेल)<input name="fname" required autocomplete="off" placeholder="उदा. अजय पाटील"></label>'+
-  '<label>मोबाइल नंबर<input name="phone" type="tel" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" placeholder="10 अंकी" required></label>'+
+  '<label>पूर्ण नाव<input name="fname" required autocomplete="off" placeholder="उदा. अजय पाटील"></label>'+
+  '<label>मोबाइल नंबर (हाच तुमचा User ID असेल)<input name="phone" type="tel" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" placeholder="10 अंकी" required></label>'+
   '<label>ईमेल (Mail ID)<input name="email" type="email" required></label>'+
   '<label>मोबाइल/ईमेल कोणाला दिसावा<select name="vis">'+['private','members','public'].map(function(k){return'<option value="'+k+'"'+(visOf({})===k?' selected':'')+'>'+VISL[k]+'</option>';}).join('')+'</select></label>'+
   '<label>जन्मतारीख (जन्म वर्ष हाच Password असेल)<input name="dob" type="date" min="1900-01-01" max="'+today+'" required></label>'+
-  '<p class="note">उदा. नाव: अजय पाटील, जन्मतारीख: 15-08-1995 → User ID: अजय, Password: 1995</p>'+
+  '<p class="note">उदा. नाव: अजय पाटील, मोबाइल: 9876543210, जन्मतारीख: 15-08-1995 → User ID: 9876543210, Password: 1995</p>'+
   '<div class="row"><button class="btn primary" type="submit">नोंदणी करा</button><button class="btn" type="button" data-act="close">रद्द</button></div></form>');
 }
 
@@ -896,8 +896,17 @@ var pending=null;
 function openModal(html,wide){$('#sheet').className='sheet'+(wide?' wide':'');$('#sheet').innerHTML=html;$('#modal').hidden=false;var f=$('#sheet input:not([type=file]),#sheet select');if(f&&f.tagName!=='SELECT')f.focus();}
 function closeModal(){$('#modal').hidden=true;pending=null;}
 function confirmModal(msg,fn){pending=fn;openModal('<h2>खात्री आहे?</h2><p>'+msg+'</p><div class="row"><button class="btn danger" data-act="yes">होय</button><button class="btn" data-act="close">रद्द</button></div>');}
-function loginModal(){openModal('<h2>Login</h2><form class="form" data-form="login"><label>User ID<input name="u" autocomplete="username" required></label><label>Password<input name="p" type="password" autocomplete="current-password" required></label><p class="note">सदस्य: User ID = नावातील पहिला शब्द, Password = जन्म वर्ष.<br>डेमो Admin: admin / admin123</p><div class="row"><button class="btn primary" type="submit">Login</button><button class="btn" type="button" data-act="forgot">Password विसरलात?</button><button class="btn" type="button" data-act="close">रद्द</button></div></form>');}
-function resetModal(){openModal('<h2>Password बदला</h2><form class="form" data-form="reset"><label>User ID<input name="u" required autocomplete="username"></label>'+
+/* User ID = मोबाइल नंबर. जुन्या सदस्यांसाठी नोंदणीकृत मोबाइल नंबरनेही Login/Reset चालते */
+function phone10(v){var d=String(v==null?'':v).replace(/\D/g,'');return d.length>=10?d.slice(-10):'';}
+function userCands(id){
+  var t=String(id||'').trim().toLowerCase(),p=phone10(id);
+  return S.users.filter(function(x){
+    if(String(x.u).toLowerCase()===t)return true;
+    if(!p||!x.mid)return false;var m=gm(x.mid);return !!m&&phone10(m.phone)===p;
+  });
+}
+function loginModal(){openModal('<h2>Login</h2><form class="form" data-form="login"><label>User ID (मोबाइल नंबर)<input name="u" type="text" inputmode="tel" autocomplete="username" required></label><label>Password<input name="p" type="password" autocomplete="current-password" required></label><p class="note">सदस्य: User ID = तुमचा 10 अंकी मोबाइल नंबर, Password = जन्म वर्ष.<br>डेमो Admin: admin / admin123</p><div class="row"><button class="btn primary" type="submit">Login</button><button class="btn" type="button" data-act="forgot">Password विसरलात?</button><button class="btn" type="button" data-act="close">रद्द</button></div></form>');}
+function resetModal(){openModal('<h2>Password बदला</h2><form class="form" data-form="reset"><label>User ID (मोबाइल नंबर)<input name="u" inputmode="tel" required autocomplete="username"></label>'+
   '<label>ओळख कशी पटवायची?<select name="how"><option value="phone">नोंदणीकृत मोबाइल नंबर</option><option value="email">नोंदणीकृत ईमेल (Mail ID)</option></select></label>'+
   '<label>मोबाइल नंबर / ईमेल<input name="proof" required autocomplete="off"></label>'+
   '<label>नवीन Password<input name="p1" type="password" minlength="4" required autocomplete="new-password"></label>'+
@@ -973,13 +982,13 @@ document.addEventListener('submit',function(e){
     var tid='T'+Date.now(),dt=g('date')||today(),nt=g('note'),mid=vs.m;
     if((S.visits[mid]||{})[code]&&!VR.some(function(x){return x.mid===mid&&x.fort===code;}))addPhoto({id:'L'+tid,tid:'L'+tid,mid:mid,fort:code,date:String(S.visits[mid][code]).slice(0,10),note:'',photo:'',by:session.u});
     var ex=VR.find(function(x){return x.mid===mid&&x.fort===code&&x.date===dt;});
-    if(ex){if(!ex.photo&&tmpVisit.length){ex.photo=tmpVisit[0];if(DB)DB.collection('trips').doc(ex.id).set(ex).catch(function(){});else saveLocalVisits();closeModal();route();toast('फोटो जोडला');}else{toast('या तारखेची भेट आधीच नोंदवली आहे',true);}return;}
+    if(ex){if(!ex.photo&&tmpVisit.length){ex.photo=tmpVisit[0];if(DB)fsSave(DB.collection('trips').doc(ex.id),ex).catch(function(){});else saveLocalVisits();closeModal();route();toast('फोटो जोडला');}else{toast('या तारखेची भेट आधीच नोंदवली आहे',true);}return;}
     var pr=Promise.all((tmpVisit.length?[tmpVisit[0]]:['']).map(function(p,i){return addPhoto({id:tid+'_'+i,tid:tid,mid:mid,fort:code,date:dt,note:nt,photo:p,by:session.u});}));
     var iso=new Date(dt+'T12:00:00').toISOString(),v=S.visits[mid]=S.visits[mid]||{};if(!v[code]||new Date(v[code])<new Date(iso))v[code]=iso;
     save();pr.then(function(){closeModal();route();toast('भेट व फोटो जतन झाले');});return;}
-  if(f==='login'){var u=S.users.find(function(x){return String(x.u).toLowerCase()===g('u').toLowerCase()&&String(x.p)===g('p');});if(!u){toast('User ID किंवा Password चुकीचा',true);return;}session={u:u.u,role:u.role,mid:u.mid||null};if(u.mid)vs.m=u.mid;closeModal();route();toast('Login झाले');return;}
+  if(f==='login'){var u=userCands(g('u')).find(function(x){return String(x.p)===g('p');});if(!u){toast('User ID किंवा Password चुकीचा',true);return;}session={u:u.u,role:u.role,mid:u.mid||null};if(u.mid)vs.m=u.mid;closeModal();route();toast('Login झाले');return;}
   if(f==='reset'){
-    var ru=S.users.find(function(x){return String(x.u).toLowerCase()===g('u').toLowerCase();}),rm=ru&&ru.mid&&gm(ru.mid),ok=false;
+    var ru=userCands(g('u'))[0],rm=ru&&ru.mid&&gm(ru.mid),ok=false;
     if(rm){if(g('how')==='phone'){var pa=g('proof').replace(/\D/g,'').slice(-10),pb=String(rm.phone||'').replace(/\D/g,'').slice(-10);ok=pa.length===10&&pa===pb;}
       else ok=g('proof').toLowerCase()===String(rm.email||'').trim().toLowerCase();}
     if(!ok){toast('User ID आणि मोबाइल/ईमेल जुळत नाही',true);return;}
@@ -1010,9 +1019,9 @@ document.addEventListener('submit',function(e){
     save();pollModal();drawPollCard();toast('सूचना जतन झाली');return;
   }
   if(f==='newuser'){
-    var full=g('fname').replace(/\s+/g,' '),fn=full.split(' ')[0],ph=g('phone').replace(/[\s-]/g,''),em=g('email'),dob=g('dob'),yr=dob.slice(0,4);
-    if(!fn||!/^\d{10}$/.test(ph)||!em||!/^\d{4}$/.test(yr)||+yr<1900||dob>new Date().toISOString().slice(0,10)){toast('सर्व माहिती नीट भरा',true);return;}
-    if(S.users.some(function(x){return String(x.u).toLowerCase()===fn.toLowerCase();})){toast('हा User ID आधीच आहे, वेगळे नाव वापरा',true);return;}
+    var full=g('fname').replace(/\s+/g,' '),ph=g('phone').replace(/[\s-]/g,''),fn=ph,em=g('email'),dob=g('dob'),yr=dob.slice(0,4);
+    if(!full||!/^\d{10}$/.test(ph)||!em||!/^\d{4}$/.test(yr)||+yr<1900||dob>new Date().toISOString().slice(0,10)){toast('सर्व माहिती नीट भरा',true);return;}
+    if(userCands(ph).length||S.members.some(function(x){return phone10(x.phone)===ph;})){toast('हा मोबाइल नंबर आधीच नोंदणीकृत आहे (User ID = मोबाइल नंबर)',true);return;}
     var nid=nextMemId();
     S.members.push({id:nid,name:full,phone:ph,email:em,dob:dob,vis:g('vis')||'private',showContact:g('vis')==='public',photo:''});S.visits[nid]={};S.users.push({u:fn,p:yr,role:'user',mid:nid});save();
     closeModal();if(isAdmin()){route();toast('नोंदणी झाली · User ID: '+fn+' · Password: '+yr);}
@@ -1028,10 +1037,10 @@ var TRK='gadkille-trips-v1',VR=[],DB=null,tmpVisit=[],lastJ='';
 try{VR=JSON.parse(localStorage.getItem(TRK)||'[]');}catch(e){VR=[];}
 function saveLocalVisits(){if(DB)return;try{localStorage.setItem(TRK,JSON.stringify(VR));}catch(e){toast('जागा संपली, फोटो जतन झाला नाही',true);}}
 function visitCount(mid,code){var u={};VR.forEach(function(t){if(t.mid===mid&&t.fort===code)u[t.tid]=1;});return Math.max(Object.keys(u).length,(S.visits[mid]||{})[code]?1:0);}
-function addPhoto(t){VR.push(t);if(DB)return DB.collection('trips').doc(t.id).set(t).catch(function(){toast('फोटो सेव्ह झाला नाही',true);});saveLocalVisits();return Promise.resolve();}
-function delPhoto(id){VR=VR.filter(function(t){return t.id!==id;});if(DB)DB.collection('trips').doc(id).delete().catch(function(){});else saveLocalVisits();}
+function addPhoto(t){VR.push(t);if(DB)return fsSave(DB.collection('trips').doc(t.id),t).catch(function(){toast('फोटो सेव्ह झाला नाही',true);});saveLocalVisits();return Promise.resolve();}
+function delPhoto(id){VR=VR.filter(function(t){return t.id!==id;});if(DB){var _r=DB.collection('trips').doc(id);fsForget(_r);_r.delete().catch(function(){});}else saveLocalVisits();}
 function clearPhoto(id){var t=VR.find(function(x){return x.id===id;});if(!t)return;if(DB){DB.collection('trips').doc(id).update({photo:''}).then(function(){t.photo='';route();toast('फोटो हटवला');}).catch(function(e){toast('फोटो हटवता आला नाही: '+((e&&(e.code||e.message))||'permission'),true);});}else{t.photo='';saveLocalVisits();route();toast('फोटो हटवला');}}
-function setVisitPhoto(id,file){if(!file)return;compress(file,function(u){var t=VR.find(function(x){return x.id===id;});if(!u||!t)return;t.photo=u;if(DB)DB.collection('trips').doc(id).set(t).catch(function(){toast('फोटो सेव्ह झाला नाही',true);});else saveLocalVisits();closeModal();route();toast('फोटो जतन झाला');});}
+function setVisitPhoto(id,file){if(!file)return;compress(file,function(u){var t=VR.find(function(x){return x.id===id;});if(!u||!t)return;t.photo=u;if(DB)fsSave(DB.collection('trips').doc(id),t).catch(function(){toast('फोटो सेव्ह झाला नाही',true);});else saveLocalVisits();closeModal();route();toast('फोटो जतन झाला');});}
 function delVisit(id){var t=VR.find(function(x){return x.id===id;});if(!t)return;delPhoto(id);var rest=VR.filter(function(x){return x.mid===t.mid&&x.fort===t.fort;}),v=S.visits[t.mid]=S.visits[t.mid]||{};if(rest.length)v[t.fort]=new Date(rest.map(function(x){return x.date;}).sort().pop()+'T12:00:00').toISOString();else delete v[t.fort];save();}
 function visitList(code){
   var mid=vs.m,f=fortMap()[code],own=canTick(mid),l=VR.filter(function(t){return t.mid===mid&&t.fort===code;}).sort(function(a,b){return a.date<b.date?1:-1;});
@@ -1039,7 +1048,44 @@ function visitList(code){
 }
 function visitChoice(code){var f=fortMap()[code];openModal('<h2>'+esc(f.name)+'</h2><p>आधी '+visitCount(vs.m,code)+' वेळा भेट दिली आहे.</p><div class="row" style="margin-top:10px"><button class="btn primary" data-act="visit-add" data-id="'+esc(code)+'">+ नवीन भेट</button><button class="btn" data-act="visit-list" data-id="'+esc(code)+'">भेटी बघा</button><button class="btn danger" data-act="visit-clear" data-id="'+esc(code)+'">सर्व भेटी हटवा</button><button class="btn" data-act="close">रद्द</button></div>');}
 function dl(id){var t=VR.find(function(x){return x.id===id;});if(!t||!t.photo)return;var a=document.createElement('a');a.href=t.photo;a.download=t.fort+'_'+t.date+'.jpg';document.body.appendChild(a);a.click();a.remove();}
-function pushState(){if(!DB)return;var j=JSON.stringify(S);lastJ=j;DB.doc('state/main').set({json:j}).catch(function(){});}
+
+/* ===== Firestore helpers: फक्त बदललेल्या fields साठी update() ===== */
+var FSC={};  /* path -> शेवटची ज्ञात server copy (onSnapshot/save नंतर भरली जाते) */
+function fsClone(o){return JSON.parse(JSON.stringify(o));}
+function fsIsObj(v){return v&&typeof v==='object'&&!Array.isArray(v);}
+function fsSeen(ref,data){FSC[ref.path]=data?fsClone(data):null;}
+function fsForget(ref){delete FSC[ref.path];}
+function fsDiff(o,n,path,out){
+  var FV=firebase.firestore.FieldValue;
+  Object.keys(n).forEach(function(k){
+    var p=path.concat(k),a=o?o[k]:undefined,b=n[k];
+    if(b===undefined)return;
+    if(fsIsObj(a)&&fsIsObj(b)&&Object.keys(b).length)fsDiff(a,b,p,out);
+    else if(JSON.stringify(a)!==JSON.stringify(b))out.push([p,b]);
+  });
+  if(o)Object.keys(o).forEach(function(k){if(!(k in n))out.push([path.concat(k),FV.delete()]);});
+  return out;
+}
+function fsSave(ref,obj){
+  var data=fsClone(obj),prev=FSC[ref.path];
+  if(!prev)return ref.set(data).then(function(){fsSeen(ref,data);});      /* नवीन document */
+  var ch=fsDiff(prev,data,[],[]);
+  if(!ch.length)return Promise.resolve();                                /* काहीच बदलले नाही */
+  var args=[];
+  ch.forEach(function(c){args.push(fsPath(c[0]),c[1]);});
+  return ref.update.apply(ref,args).then(function(){fsSeen(ref,data);}).catch(function(e){
+    if(e&&e.code==='not-found')return ref.set(data).then(function(){fsSeen(ref,data);});
+    throw e;});
+}
+function fsPath(a){var FP=firebase.firestore.FieldPath;return new (Function.prototype.bind.apply(FP,[null].concat(a)))();}
+/* सर्व listeners एकाच ठिकाणी, म्हणजे गरज पडल्यास unsubscribe करता येतात */
+var UNSUBS=[];
+function listen(ref,onOk,onErr){
+  var u=ref.onSnapshot(onOk,function(err){try{console.warn('onSnapshot error:',ref.path||'',err&&err.code);}catch(x){}if(onErr)onErr(err);});
+  UNSUBS.push(u);return u;
+}
+function stopListeners(){UNSUBS.splice(0).forEach(function(u){try{u();}catch(e){}});}
+function pushState(){if(!DB)return;var j=JSON.stringify(S);lastJ=j;fsSave(DB.doc('state/main'),{json:j}).catch(function(){});}
 function compress(file,cb){var fr=new FileReader();fr.onload=function(){var im=new Image();im.onload=function(){var m=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*m);c.height=Math.round(im.height*m);c.getContext('2d').drawImage(im,0,0,c.width,c.height);var q=.65,u=c.toDataURL('image/jpeg',q);while(u.length>180000&&q>.3){q-=.1;u=c.toDataURL('image/jpeg',q);}cb(u);};im.onerror=function(){cb('');};im.src=fr.result;};fr.readAsDataURL(file);}
 function readVisitPhoto(files){tmpVisit=[];$('#vprev').innerHTML='';Array.prototype.slice.call(files,0,1).forEach(function(f){compress(f,function(u){if(!u)return;tmpVisit.push(u);$('#vprev').insertAdjacentHTML('beforeend','<img src="'+u+'" alt="">');});});}
 function visitForm(code){
@@ -1068,7 +1114,7 @@ function colSave(k){try{localStorage.setItem(LK[k],JSON.stringify(COL[k]));}catc
 function colPut(k,o){
   var i=COL[k].findIndex(function(x){return x.id===o.id;});
   if(i<0)COL[k].push(o);else COL[k][i]=o;
-  if(DB)return DB.collection(k).doc(o.id).set(o).catch(function(){toast('Firebase मध्ये सेव्ह झाले नाही',true);});
+  if(DB)return fsSave(DB.collection(k).doc(o.id),o).catch(function(){toast('Firebase मध्ये सेव्ह झाले नाही',true);});
   colSave(k);return Promise.resolve();
 }
 function colDel(k,id){
@@ -1451,7 +1497,7 @@ function pushMembers(){
   if(!DB||!MEMREADY)return;
   var ids={};
   S.members.forEach(function(m){ids[m.id]=1;var p=memPack(m),j=sj(p);if(MEMJ[m.id]===j)return;MEMJ[m.id]=j;MEMD[m.id]=p;
-    DB.collection('members').doc(m.id).set(p).catch(function(){delete MEMJ[m.id];toast('सदस्य Firebase मध्ये सेव्ह झाला नाही',true);});});
+    fsSave(DB.collection('members').doc(m.id),p).catch(function(){delete MEMJ[m.id];toast('सदस्य Firebase मध्ये सेव्ह झाला नाही',true);});});
   Object.keys(MEMJ).forEach(function(id){if(!ids[id]){delete MEMJ[id];delete MEMD[id];DB.collection('members').doc(id).delete().catch(function(){});}});
   PEND={};
 }
@@ -1479,15 +1525,15 @@ function tryMemInit(){
   if(!Object.keys(MEMD).length)pushMembers(); /* पहिल्यांदा: आधीचे सदस्य 'members' मध्ये कॉपी */
 }
 function initMembers(db){
-  db.collection('members').onSnapshot(function(q){
+  listen(db.collection('members'),function(q){
     q.docChanges().forEach(function(c){var id=c.doc.id;
-      if(c.type==='removed'){delete MEMD[id];delete MEMJ[id];S.members=S.members.filter(function(x){return x.id!==id;});S.users=S.users.filter(function(x){return x.mid!==id;});delete S.visits[id];}
-      else{var d=c.doc.data();MEMD[id]=d;MEMJ[id]=sj(d);}
+      if(c.type==='removed'){fsForget(c.doc.ref);delete MEMD[id];delete MEMJ[id];S.members=S.members.filter(function(x){return x.id!==id;});S.users=S.users.filter(function(x){return x.mid!==id;});delete S.visits[id];}
+      else{var d=c.doc.data();fsSeen(c.doc.ref,d);MEMD[id]=d;MEMJ[id]=sj(d);}
     });
     MEMSNAP=true;
     if(STATEREADY){mergeMembers();rerenderMaybe(['home','members','visits','map','reports','trips','gallery']);}
     tryMemInit();
-  },function(){});
+  });
 }
 
 /* ---------- VIEW COUNT ---------- */
@@ -1497,8 +1543,8 @@ function localViews(){var n=0;try{n=parseInt(localStorage.getItem(VKEY)||'0',10)
 function initViews(db){
   var seen=false;try{seen=!!sessionStorage.getItem(VSEEN);}catch(e){}
   var ref=db.doc('stats/views');
-  ref.onSnapshot(function(sn){viewN=sn.exists?(sn.data().n||0):0;drawViews();},function(){localViews();});
-  if(!seen){ref.set({n:firebase.firestore.FieldValue.increment(1)},{merge:true}).then(function(){try{sessionStorage.setItem(VSEEN,'1');}catch(e){}}).catch(function(){});}
+  listen(ref,function(sn){viewN=sn.exists?(sn.data().n||0):0;drawViews();},function(){localViews();});
+  if(!seen){var inc=firebase.firestore.FieldValue.increment(1);ref.update({n:inc}).catch(function(e){if(e&&e.code==='not-found')return ref.set({n:1});throw e;}).then(function(){try{sessionStorage.setItem(VSEEN,'1');}catch(e){}}).catch(function(){});}
 }
 var PRES={},lastBeat=0;
 function isOn(id){return !!PRES[id]&&Date.now()-PRES[id]<180000;}
@@ -1506,7 +1552,7 @@ function beat(force){
   if(!DB||!session.mid)return;
   if(!force&&Date.now()-lastBeat<30000)return;
   lastBeat=Date.now();
-  DB.collection('presence').doc(session.mid).set({t:Date.now()}).catch(function(){});
+  fsSave(DB.collection('presence').doc(session.mid),{t:Date.now()}).catch(function(){});
 }
 function goOffline(){if(DB&&session.mid)DB.collection('presence').doc(session.mid).delete().catch(function(){});}
 function avW(m,cls){return '<span class="avw">'+avatar(m,cls)+(isOn(m.id)?'<i class="odot" title="Online"></i>':'')+'</span>';}
@@ -1950,23 +1996,24 @@ function hotelForm(){
   openModal('<h2>हॉटेल जोडा · '+esc(f.name)+'</h2><p class="muted small">Google Maps / हॉटेल वेबसाइटवरून पाहिलेला खरा दर व रेटिंग नोंदवा. यामुळे सर्वांचा अंदाज अधिक अचूक होतो.</p><form class="form" data-form="hotel" data-fort="'+esc(f.code)+'"><label>हॉटेलचे नाव<input name="nm" required maxlength="60"></label><div class="filters" style="margin:0"><label>दर (₹ / रूम / रात्र)<input name="pr" type="number" min="1" step="any" required></label><label>रेटिंग (0–5)<input name="rt" type="number" min="0" max="5" step="0.1"></label><label>किल्ल्यापासून अंतर (km)<input name="km" type="number" min="0" step="any" required></label></div><label>फोन (ऐच्छिक)<input name="ph" maxlength="20"></label><div class="row"><button class="btn primary" type="submit">जतन करा</button><button class="btn" type="button" data-act="close">रद्द</button></div></form>');
 }
 function initExtra(db){
-  db.collection('pcomments').onSnapshot(function(q){
+  listen(db.collection('pcomments'),function(q){
+    q.docs.forEach(function(d){fsSeen(d.ref,d.data());});
     CM=q.docs.map(function(d){return d.data();});
     var el=$('#cmlist');if(el)drawCmts(el.dataset.pid);
     if(currentPage()==='gallery'&&$('#modal').hidden&&$('#gal'))drawGallery();
   },function(){});
-  db.collection('hotels').onSnapshot(function(q){
+  listen(db.collection('hotels'),function(q){
+    q.docs.forEach(function(d){fsSeen(d.ref,d.data());});
     HT=q.docs.map(function(d){return d.data();});
     if(currentPage()==='cost'&&COST.last&&$('#cres')&&$('#modal').hidden&&COST.last.P.fort===COST.fort&&canUseCost(COST.fort))renderCost(COST.last.o,COST.last.P);
   },function(){});
-  db.collection('sitelikes').onSnapshot(function(q){
+  listen(db.collection('sitelikes'),function(q){
     SL.n=q.size;SL.ids=[];SL.me=false;
     q.docs.forEach(function(d){var x=d.data()||{};if((VKS.ip&&d.id==='i'+VKS.ip)||x.dv===VKS.dv||d.id==='d'+VKS.dv){SL.me=true;SL.ids.push(d.id);}});
     drawSiteLike();
   },function(){});
-  db.doc('settings/cost').onSnapshot(function(sn){if(sn.exists)CS=Object.assign({on:false,fee:0,qr:'',note:''},sn.data());costSync();},function(){});
-  db.collection('costaccess').onSnapshot(function(q){CA=q.docs.map(function(d){return d.data();});costSync();},function(){});
-  vkReady().then(function(){db.collection('sitelikes').get().catch(function(){});});
+  listen(db.doc('settings/cost'),function(sn){if(sn.exists)fsSeen(sn.ref,sn.data());if(sn.exists)CS=Object.assign({on:false,fee:0,qr:'',note:''},sn.data());costSync();},function(){});
+  listen(db.collection('costaccess'),function(q){q.docs.forEach(function(d){fsSeen(d.ref,d.data());});CA=q.docs.map(function(d){return d.data();});costSync();},function(){});
 }
 
 /* =====================================================================
@@ -1990,7 +2037,7 @@ function costPendN(){return CA.filter(function(x){return x.status==='pending';})
 function gateSigNow(){var l=lastReq(COST.fort);return [payOn(),CS.fee,CS.hours,(CS.qr||'').length,CS.note,COST.fort,canUseCost(COST.fort),l?l.status:''].join('|');}
 function caPut(o){
   var i=CA.findIndex(function(x){return x.id===o.id;});if(i<0)CA.push(o);else CA[i]=o;
-  if(DB)return DB.collection('costaccess').doc(o.id).set(o).catch(function(){toast('सेव्ह झाले नाही (Firestore Rules तपासा)',true);});
+  if(DB)return fsSave(DB.collection('costaccess').doc(o.id),o).catch(function(){toast('सेव्ह झाले नाही (Firestore Rules तपासा)',true);});
   saveCa();return Promise.resolve();
 }
 function caBadge(a){
@@ -2077,7 +2124,7 @@ document.addEventListener('click',function(e){
       if(!isAdmin())break;
       var nf=Math.max(0,parseFloat(cv('ca_fee'))||0),non=cv('ca_on')==='1',nh=parseFloat(cv('ca_hrs'));
       CS={on:non,fee:nf,hours:nh>0?nh:24,note:cv('ca_note').trim(),qr:tmpQr||CS.qr||''};tmpQr='';
-      if(DB)DB.doc('settings/cost').set(CS).catch(function(){toast('सेव्ह झाले नाही (Firestore Rules तपासा)',true);});else saveCs();
+      if(DB)fsSave(DB.doc('settings/cost'),CS).catch(function(){toast('सेव्ह झाले नाही (Firestore Rules तपासा)',true);});else saveCs();
       toast(non&&!nf?'पेमेंट चालू करण्यासाठी रक्कम टाका':'जतन झाले',non&&!nf);refreshCaAdmin();break;
     case'ca-ok':case'ca-rej':
       if(!isAdmin())break;
@@ -2134,7 +2181,7 @@ document.addEventListener('submit',function(e){
     vkReady().then(function(){
       var c={id:'C'+Date.now()+Math.random().toString(36).slice(2,6),pid:pid,name:nm,text:tx,t:nowIso(),mid:session.mid||'',vk:vkEntry()};
       CM.push(c);
-      if(DB)DB.collection('pcomments').doc(c.id).set(c).catch(function(){toast('कमेंट सेव्ह झाली नाही (Firestore Rules तपासा)',true);});else saveCm();
+      if(DB)fsSave(DB.collection('pcomments').doc(c.id),c).catch(function(){toast('कमेंट सेव्ह झाली नाही (Firestore Rules तपासा)',true);});else saveCm();
       form.elements.tx.value='';drawCmts(pid);
       if(currentPage()==='gallery')drawGallery();
     });
@@ -2156,7 +2203,7 @@ document.addEventListener('submit',function(e){
   if(!g('nm')||!(price>0)||!(km>=0)){toast('माहिती नीट भरा',true);return;}
   var hh={id:'H'+Date.now(),fort:form.dataset.fort,name:g('nm'),price:price,km:km,rating:rt===''?'':Math.min(5,Math.max(0,parseFloat(rt)||0)),phone:g('ph'),add:session.mid||'ADMIN',t:nowIso()};
   HT.push(hh);
-  if(DB)DB.collection('hotels').doc(hh.id).set(hh).catch(function(){toast('हॉटेल सेव्ह झाले नाही (Firestore Rules तपासा)',true);});else saveHt();
+  if(DB)fsSave(DB.collection('hotels').doc(hh.id),hh).catch(function(){toast('हॉटेल सेव्ह झाले नाही (Firestore Rules तपासा)',true);});else saveHt();
   closeModal();toast('हॉटेल जोडले');
   if(COST.last&&$('#cres'))renderCost(COST.last.o,COST.last.P);
 });
@@ -2167,16 +2214,18 @@ function fixAll(){
   var M=S.fortMig&&S.fortMig.map;if(!M)return;
   var at=S.fortMig.at,vch=false;
   function chk(r){if(r.fm||!r.fort)return false;var ts=+((/(\d{12,})/.exec(r.id||'')||[])[1])||0;if(ts>=at)return false;r.fort=M[r.fort]||'';r.fm=1;return true;}
-  VR.forEach(function(r){if(chk(r)){vch=true;if(DB)DB.collection('trips').doc(r.id).set(r).catch(function(){});}});
+  VR.forEach(function(r){if(chk(r)){vch=true;if(DB)fsSave(DB.collection('trips').doc(r.id),r).catch(function(){});}});
   if(vch&&!DB)saveLocalVisits();
   COL.tours.slice().forEach(function(r){if(chk(r))colPut('tours',r);});
 }
 function setSync(msg){var el=$('#syncst');if(el)el.textContent=msg;}
+var SYNCSTARTED=false;
 function initSync(db){
+  if(SYNCSTARTED)return;SYNCSTARTED=true;
   DB=db;FBDECIDED=true;initViews(db);initMembers(db);initExtra(db);
-  db.doc('state/main').onSnapshot(function(sn){
+  listen(db.doc('state/main'),function(sn){
     setSync(' · ☁️ Firebase लाईव्ह');
-    if(sn.exists){
+    if(sn.exists){fsSeen(sn.ref,sn.data());
       var j=(sn.data()||{}).json;
       if(j&&j!==lastJ){
         try{var n=JSON.parse(j);
@@ -2186,10 +2235,10 @@ function initSync(db){
     }else pushState();
     STATEREADY=true;tryMemInit();maybePendPop();
   },function(err){setSync(' · ⚠️ Firebase त्रुटी: '+((err&&(err.code||err.message))||'')+' (Firestore Rules तपासा)');});
-  db.collection('presence').onSnapshot(function(q){PRES={};q.docs.forEach(function(d){PRES[d.id]=(d.data()||{}).t||0;});rerenderMaybe(['members']);},function(){});
-  db.collection('trips').onSnapshot(function(q){VR=q.docs.map(function(d){return d.data();});fixAll();rerenderMaybe(['gallery','visits']);},function(){});
+  listen(db.collection('presence'),function(q){PRES={};q.docs.forEach(function(d){fsSeen(d.ref,d.data());PRES[d.id]=(d.data()||{}).t||0;});rerenderMaybe(['members']);});
+  listen(db.collection('trips'),function(q){q.docs.forEach(function(d){fsSeen(d.ref,d.data());});VR=q.docs.map(function(d){return d.data();});fixAll();rerenderMaybe(['gallery','visits']);});
   ['tours','bills','pays'].forEach(function(k){
-    db.collection(k).onSnapshot(function(q){COL[k]=q.docs.map(function(d){return d.data();});if(k==='tours'){COL.tours.forEach(normTour);fixAll();}COLRDY[k]=true;rerenderMaybe(['trips','home']);maybePendPop();},function(){COLRDY[k]=true;maybePendPop();});
+    listen(db.collection(k),function(q){q.docs.forEach(function(d){fsSeen(d.ref,d.data());});COL[k]=q.docs.map(function(d){return d.data();});if(k==='tours'){COL.tours.forEach(normTour);fixAll();}COLRDY[k]=true;rerenderMaybe(['trips','home']);maybePendPop();},function(){COLRDY[k]=true;maybePendPop();});
   });
 }
 if(window.GK_DB)initSync(window.GK_DB);
@@ -2203,12 +2252,8 @@ route();
 })();
 </script>
 
-<!-- Firebase SDK (compat) : app + firestore + analytics -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
+<!-- Firebase SDK (compat) : एक CDN बंद/ब्लॉक असेल तर आपोआप पुढचा CDN वापरतो -->
 <script>
-/* ===== Firebase config (project: mohim-ff0b5) ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyCLgoETYNoNiyskXOzDsOOvr54XIoUVuFA",
   authDomain: "mohim-ff0b5.firebaseapp.com",
@@ -2218,14 +2263,46 @@ const firebaseConfig = {
   appId: "1:600731202383:web:2280ea0bc36f4fa3fccb3a",
   measurementId: "G-4SC3C09LFG"
 };
-try{
-  firebase.initializeApp(firebaseConfig);
-  window.GK_DB = firebase.firestore();
-  try{ firebase.analytics(); }catch(e){}   /* Analytics नसले तरी app चालेल */
-  window.dispatchEvent(new Event('gk-db'));
-}catch(e){
-  window.dispatchEvent(new Event('gk-db-fail'));
-}
+(async function(){
+  var V='10.12.2';
+  var BASES=[
+    function(n){return 'https://www.gstatic.com/firebasejs/'+V+'/firebase-'+n+'-compat.js';},
+    function(n){return 'https://cdn.jsdelivr.net/npm/firebase@'+V+'/firebase-'+n+'-compat.js';},
+    function(n){return 'https://cdnjs.cloudflare.com/ajax/libs/firebase/'+V+'/firebase-'+n+'-compat.min.js';}
+  ];
+  function load(url){return new Promise(function(res,rej){
+    var s=document.createElement('script');s.src=url;s.async=false;
+    s.onload=function(){res();};s.onerror=function(){s.remove();rej(new Error('load failed: '+url));};
+    document.head.appendChild(s);});}
+  async function loadLib(name,ok){
+    for(var i=0;i<BASES.length&&!ok();i++){try{await load(BASES[i](name));}catch(e){console.warn(e.message);}}
+    return ok();
+  }
+  var hasApp=function(){return !!(window.firebase&&firebase.initializeApp);};
+  var hasFs=function(){return !!(window.firebase&&firebase.firestore);};
+  try{
+    if(!(await loadLib('app',hasApp)))throw new Error('Firebase app SDK लोड झाले नाही (इंटरनेट/ब्लॉक)');
+    if(!(await loadLib('firestore',hasFs)))throw new Error('Firestore SDK लोड झाले नाही (इंटरनेट/ब्लॉक)');
+    /* 1) कोणतीही operation करण्यापूर्वी terminate() */
+    firebase.initializeApp(firebaseConfig);
+    var tmp=firebase.firestore();
+    try{
+      await tmp.terminate();
+      /* 2) terminate नंतर जुना IndexedDB cache पुसणे */
+      await tmp.clearPersistence();
+    }catch(e){console.warn('terminate/clearPersistence:',e&&e.code||e);}
+    /* terminate झालेली instance पुन्हा वापरता येत नाही, म्हणून app नव्याने तयार करतो */
+    await firebase.app().delete();
+    firebase.initializeApp(firebaseConfig);
+    window.GK_DB=firebase.firestore();
+    window.dispatchEvent(new Event('gk-db'));
+    /* Analytics ऐच्छिक: न चालले तरी app चालेल */
+    try{ if(await loadLib('analytics',function(){return !!(firebase.analytics);}))firebase.analytics(); }catch(e){}
+  }catch(e){
+    console.error(e);
+    window.dispatchEvent(new Event('gk-db-fail'));
+  }
+})();
 </script>
 
 </body></html>
