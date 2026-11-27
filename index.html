@@ -907,7 +907,7 @@ function userCands(id){
 }
 function loginModal(){openModal('<h2>Login</h2><form class="form" data-form="login"><label>User ID (मोबाइल नंबर)<input name="u" type="text" inputmode="tel" autocomplete="username" required></label><label>Password<input name="p" type="password" autocomplete="current-password" required></label><p class="note">सदस्य: User ID = तुमचा 10 अंकी मोबाइल नंबर, Password = जन्म वर्ष.<br>डेमो Admin: admin / admin123</p><div class="row"><button class="btn primary" type="submit">Login</button><button class="btn" type="button" data-act="forgot">Password विसरलात?</button><button class="btn" type="button" data-act="close">रद्द</button></div></form>');}
 function resetModal(){openModal('<h2>Password बदला</h2><form class="form" data-form="reset"><label>User ID (मोबाइल नंबर)<input name="u" inputmode="tel" required autocomplete="username"></label>'+
-  '<label>ओळख कशी पटवायची?<select name="how"><option value="phone">नोंदणीकृत मोबाइल नंबर</option><option value="email">नोंदणीकृत ईमेल (Mail ID)</option></select></label>'+
+  '<label>ओळख कशी पटवायची?<select name="how"><option value="email">नोंदणीकृत ईमेल (Mail ID)</option></select></label>'+
   '<label>मोबाइल नंबर / ईमेल<input name="proof" required autocomplete="off"></label>'+
   '<label>नवीन Password<input name="p1" type="password" minlength="4" required autocomplete="new-password"></label>'+
   '<label>नवीन Password पुन्हा<input name="p2" type="password" minlength="4" required autocomplete="new-password"></label>'+
